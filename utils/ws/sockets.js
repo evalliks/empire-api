@@ -7,7 +7,7 @@ async function getGgeSockets() {
     const networksIds = [1, 5, 11, 26, 34, 39, 64, 65, 68];
 
     for (const networkId of networksIds) {
-        const response = await fetch(`https://empire-html5.goodgamestudios.com/config/network/${networkId}.xml`, { signal: AbortSignal.timeout(60 * 1000) });
+        const response = await fetch(`https://media.goodgamestudios.com/games-config/network/12/live/${networkId}.xml`, { signal: AbortSignal.timeout(60 * 1000) });
         const data = new XMLParser().parse(await response.text());
         if (!Array.isArray(data.network.instances.instance)) {
             data.network.instances.instance = [data.network.instances.instance];
@@ -24,11 +24,18 @@ async function getGgeSockets() {
 
 async function getE4kSockets() {
     const sockets = {};
-    const response = await fetch("https://raw.githubusercontent.com/danadum/ggs-assets/main/e4k/network.xml", { signal: AbortSignal.timeout(60 * 1000) });
-    const data = new XMLParser().parse(await response.text());
-    for (const server of data.network.instances.instance) {
-        const socket = new E4kSocket(`ws://${server.server}`, server.zone, process.env.USERNAME, process.env.PASSWORD);
-        sockets[server.zone] = socket;
+    const networksIds = [72, 77];
+
+    for (const networkId of networksIds) {
+        const response = await fetch(`https://media.goodgamestudios.com/games-config/network/16/live/${networkId}.xml`, { signal: AbortSignal.timeout(60 * 1000) });
+        const data = new XMLParser().parse(await response.text());
+        if (!Array.isArray(data.network.instances.instance)) {
+            data.network.instances.instance = [data.network.instances.instance];
+        }
+        for (const server of data.network.instances.instance) {
+            const socket = new E4kSocket(`ws://${server.server}`, server.zone, process.env.USERNAME, process.env.PASSWORD);
+            sockets[server.zone] = socket;
+        }
     }
     return sockets;
 }

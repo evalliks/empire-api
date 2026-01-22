@@ -47,6 +47,7 @@ class BaseSocket {
 
     send(data) {
         if (this.onSend) this.onSend(data);
+        console.log(`Sending data: ${data}`);
         this.ws.send(data);
     }
 
@@ -117,6 +118,7 @@ class BaseSocket {
     }
 
     _processResponse(response) {
+        console.log(`Processing response: ${JSON.stringify(response)}`);
         for (const message of this.messages) {
             if (
                 (response.type === 'json' && message.type === 'json' &&
