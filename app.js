@@ -1,58 +1,101 @@
 const express = require('express');
 const commands = require('./data/commands.json');
 const { setNestedValue } = require('./utils/nestedHeaders');
+const { verifyBot } = require('./utils/verifyBot');
+const { ggeServerMap, e4kServerMap } = require('./utils/ws/sockets');
 
 module.exports = function (sockets) {
     const app = express();
 
+    app.use(express.json());
+
     app.use((req, res, next) => {
         res.header("Access-Control-Allow-Origin", "*");
-        res.header("Access-Control-Allow-Methods", "GET");
+        res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+        if (req.method === "OPTIONS") return res.sendStatus(204);
         next();
     });
 
-    app.get("/:server/:command/:headers", async (req, res) => {
-        if (req.params.server in sockets) {
-            if (sockets[req.params.server] !== null && sockets[req.params.server].connected.isSet) {
-                try {
-                    const messageHeaders = JSON.parse(`{${req.params.headers}}`);
-                    sockets[req.params.server].socket.sendJsonCommand(req.params.command, messageHeaders);
+    // ─── Lista de servidores disponíveis ─────────────────────────────────────
+    app.get("/servers", (req, res) => {
+        const gge = Object.keys(ggeServerMap).map(zone => ({ zone, gameType: 'GGE' }));
+        const e4k = Object.keys(e4kServerMap).map(zone => ({ zone, gameType: 'E4K' }));
+        const all = [...gge, ...e4k].sort((a, b) => a.zone.localeCompare(b.zone));
+        res.status(200).json(all);
+    });
 
-                    let responseHeaders = {};
-                    if (req.params.command in commands) {
-                        for (const [messageKey, responsePath] of Object.entries(commands[req.params.command])) {
-                            if (messageKey in messageHeaders) {
-                                setNestedValue(responseHeaders, responsePath, messageHeaders[messageKey]);
-                            }
-                        }    
-                    } else {
-                        responseHeaders = messageHeaders;
-                    }
+    // ─── Verificação de credenciais do bot ───────────────────────────────────
+    // Body: { server: "EmpireEx_1", gameName: "NomeJogador", gamePassword: "senha" }
+    app.post("/verify-bot", async (req, res) => {
+        const { server, gameName, gamePassword } = req.body ?? {};
 
-                    const response = await sockets[req.params.server].socket.waitForJsonResponse(req.params.command, responseHeaders, timeout = 1000);
-                    res.status(200).json({server: req.params.server, command: req.params.command, return_code: response.payload.status, content: response.payload.data});
-                } catch (error) {
-                    console.log(error.message);
-                    res.status(400).json({ error: "Invalid command or headers" });
-                }
-            } else {
-                res.status(500).json({ error: "Server not connected" });
-            }
-        } else {
-            res.status(404).json({ error: "Server not found" });
+        if (!server || !gameName || !gamePassword) {
+            return res.status(400).json({ error: "server, gameName e gamePassword são obrigatórios." });
+        }
+
+        try {
+            const result = await verifyBot(server, gameName, gamePassword);
+            const status = result.valid ? 200 : 401;
+            return res.status(status).json(result);
+        } catch (error) {
+            console.error("Erro em /verify-bot:", error.message);
+            return res.status(500).json({ valid: false, reason: "Erro interno na verificação." });
         }
     });
 
+    // ─── Envia comando do jogo pelo socket de um bot ─────────────────────────
+    app.get("/:botId/:command/:headers", async (req, res) => {
+        const { botId, command, headers } = req.params;
+
+        if (!(botId in sockets)) {
+            return res.status(404).json({ error: "Bot não encontrado ou desconectado." });
+        }
+
+        const botSocket = sockets[botId];
+
+        if (!botSocket.connected.isSet) {
+            return res.status(500).json({ error: "Bot não está conectado ao servidor do jogo." });
+        }
+
+        try {
+            const messageHeaders = JSON.parse(`{${headers}}`);
+            botSocket.socket.sendJsonCommand(command, messageHeaders);
+
+            let responseHeaders = {};
+            if (command in commands) {
+                for (const [messageKey, responsePath] of Object.entries(commands[command])) {
+                    if (messageKey in messageHeaders) {
+                        setNestedValue(responseHeaders, responsePath, messageHeaders[messageKey]);
+                    }
+                }
+            } else {
+                responseHeaders = messageHeaders;
+            }
+
+            const response = await botSocket.socket.waitForJsonResponse(command, responseHeaders, 1000);
+            return res.status(200).json({
+                botId,
+                command,
+                return_code: response.payload.status,
+                content: response.payload.data,
+            });
+        } catch (error) {
+            console.error(`Erro no comando ${command} (bot ${botId}):`, error.message);
+            return res.status(400).json({ error: "Comando inválido, timeout ou headers incorretos." });
+        }
+    });
+
+    // ─── Status de conexão de todos os bots ─────────────────────────────────
     app.get("/status", (req, res) => {
         const status = {};
-        for (const [server, socket] of Object.entries(sockets)) {
-            status[server] = socket.connected.isSet;
+        for (const [botId, socket] of Object.entries(sockets)) {
+            status[botId] = socket.connected.isSet;
         }
         res.status(200).json(status);
     });
 
-    app.get("/", (req, res) => res.status(200).send("API running"));
+    app.get("/", (req, res) => res.status(200).send("Empire API rodando"));
 
     return app;
-}
+};
