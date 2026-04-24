@@ -78,19 +78,32 @@ async function verifyGge(serverZone, gameName, gamePassword) {
 
             if (!regData.res || regData.err.length > 0) {
                 socket.close();
-                return { valid: false, reason: "Falha no registro automatico da conta GGE." };
+                return {
+                    valid: false,
+                    reason: "Falha no registro automatico da conta GGE.",
+                    loginStatus: lliResponse.payload.status,
+                    registerError: regData.err,
+                };
             }
 
             socket.sendJsonCommand("lli", GGE_LOGIN_PAYLOAD(gameName, gamePassword));
             const lliResponse2 = await socket.waitForJsonResponse("lli", false, 15000);
             if (lliResponse2.payload.status !== 0) {
                 socket.close();
-                return { valid: false, reason: "Credenciais invalidas apos registro." };
+                return {
+                    valid: false,
+                    reason: "Credenciais invalidas apos registro.",
+                    loginStatus: lliResponse2.payload.status,
+                };
             }
             registered = true;
         } else if (lliResponse.payload.status !== 0) {
             socket.close();
-            return { valid: false, reason: "Credenciais invalidas (usuario ou senha incorretos)." };
+            return {
+                valid: false,
+                reason: "Credenciais invalidas (usuario ou senha incorretos).",
+                loginStatus: lliResponse.payload.status,
+            };
         }
 
         socket.sendJsonCommand("gpi", {});

@@ -7,7 +7,6 @@ const { getUserFromAccessToken, setBotPower } = require('./utils/supabaseService
 
 module.exports = function (sockets) {
     const app = express();
-    const recaptchaSecretKey = process.env.RECAPTCHA_SECRET_KEY;
 
     app.use(express.json());
 
@@ -18,33 +17,6 @@ module.exports = function (sockets) {
         if (req.method === "OPTIONS") return res.sendStatus(204);
         next();
     });
-
-    async function validateRecaptchaToken(token) {
-        if (!recaptchaSecretKey) {
-            throw new Error("RECAPTCHA_SECRET_KEY nao configurada.");
-        }
-
-        if (!token) {
-            return { valid: false, reason: "Resolva o reCAPTCHA antes de continuar." };
-        }
-
-        const params = new URLSearchParams();
-        params.set("secret", recaptchaSecretKey);
-        params.set("response", token);
-
-        const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: params.toString(),
-        });
-
-        const data = await response.json();
-        if (!data.success) {
-            return { valid: false, reason: "Falha na validacao do reCAPTCHA." };
-        }
-
-        return { valid: true };
-    }
 
     async function getAuthenticatedUser(req) {
         const authHeader = req.get("authorization") ?? "";
@@ -89,18 +61,13 @@ module.exports = function (sockets) {
     // ─── Verificação de credenciais do bot ───────────────────────────────────
     // Body: { server: "EmpireEx_1", gameName: "NomeJogador", gamePassword: "senha" }
     app.post("/verify-bot", async (req, res) => {
-        const { server, gameName, gamePassword, recaptchaToken } = req.body ?? {};
+        const { server, gameName, gamePassword } = req.body ?? {};
 
         if (!server || !gameName || !gamePassword) {
             return res.status(400).json({ error: "server, gameName e gamePassword são obrigatórios." });
         }
 
         try {
-            const recaptcha = await validateRecaptchaToken(recaptchaToken);
-            if (!recaptcha.valid) {
-                return res.status(400).json({ valid: false, reason: recaptcha.reason });
-            }
-
             const result = await verifyBot(server, gameName, gamePassword);
             const status = result.valid ? 200 : 401;
             return res.status(status).json(result);
@@ -111,18 +78,13 @@ module.exports = function (sockets) {
     });
 
     app.post("/discover-server", async (req, res) => {
-        const { gameName, gamePassword, recaptchaToken, preferredServer } = req.body ?? {};
+        const { gameName, gamePassword, preferredServer } = req.body ?? {};
 
         if (!gameName || !gamePassword) {
             return res.status(400).json({ error: "gameName e gamePassword sao obrigatorios." });
         }
 
         try {
-            const recaptcha = await validateRecaptchaToken(recaptchaToken);
-            if (!recaptcha.valid) {
-                return res.status(400).json({ valid: false, reason: recaptcha.reason });
-            }
-
             const result = await discoverBotServer(gameName, gamePassword, preferredServer);
             const status = result.valid ? 200 : 404;
             return res.status(status).json(result);
