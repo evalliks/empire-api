@@ -215,20 +215,59 @@ async function verifyBot(serverZone, gameName, gamePassword) {
     return { valid: false, reason: `Servidor "${serverZone}" nao esta disponivel.` };
 }
 
+function withTimeout(promise, ms, fallback) {
+    return Promise.race([
+        promise,
+        new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+    ]);
+}
+
 async function discoverBotServer(gameName, gamePassword) {
     const serverZones = [
         ...Object.keys(ggeServerMap),
         ...Object.keys(e4kServerMap),
     ];
+    const maxConcurrency = 4;
+    const perServerTimeoutMs = 12000;
+    const overallTimeoutMs = 45000;
+    const startedAt = Date.now();
 
-    for (const serverZone of serverZones) {
-        const result = await verifyBot(serverZone, gameName, gamePassword);
-        if (result.valid) {
-            return {
-                ...result,
-                checkedServers: serverZones.length,
-            };
+    let currentIndex = 0;
+    let foundResult = null;
+
+    const worker = async () => {
+        while (currentIndex < serverZones.length && !foundResult) {
+            if (Date.now() - startedAt > overallTimeoutMs) return;
+
+            const serverZone = serverZones[currentIndex++];
+            const result = await withTimeout(
+                verifyBot(serverZone, gameName, gamePassword),
+                perServerTimeoutMs,
+                { valid: false, reason: `Timeout ao verificar ${serverZone}.` }
+            );
+
+            if (result && result.valid) {
+                foundResult = {
+                    ...result,
+                    checkedServers: serverZones.length,
+                };
+                return;
+            }
         }
+    };
+
+    await Promise.all(
+        Array.from({ length: Math.min(maxConcurrency, serverZones.length) }, () => worker())
+    );
+
+    if (foundResult) return foundResult;
+
+    if (Date.now() - startedAt > overallTimeoutMs) {
+        return {
+            valid: false,
+            reason: "A busca demorou demais. Tente novamente ou selecione o servidor manualmente.",
+            checkedServers: serverZones.length,
+        };
     }
 
     return {
