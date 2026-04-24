@@ -1,7 +1,7 @@
 const express = require('express');
 const commands = require('./data/commands.json');
 const { setNestedValue } = require('./utils/nestedHeaders');
-const { verifyBot } = require('./utils/verifyBot');
+const { verifyBot, discoverBotServer } = require('./utils/verifyBot');
 const { ggeServerMap, e4kServerMap } = require('./utils/ws/sockets');
 
 module.exports = function (sockets) {
@@ -41,6 +41,23 @@ module.exports = function (sockets) {
         } catch (error) {
             console.error("Erro em /verify-bot:", error.message);
             return res.status(500).json({ valid: false, reason: "Erro interno na verificação." });
+        }
+    });
+
+    app.post("/discover-server", async (req, res) => {
+        const { gameName, gamePassword } = req.body ?? {};
+
+        if (!gameName || !gamePassword) {
+            return res.status(400).json({ error: "gameName e gamePassword sao obrigatorios." });
+        }
+
+        try {
+            const result = await discoverBotServer(gameName, gamePassword);
+            const status = result.valid ? 200 : 404;
+            return res.status(status).json(result);
+        } catch (error) {
+            console.error("Erro em /discover-server:", error.message);
+            return res.status(500).json({ valid: false, reason: "Erro interno na descoberta do servidor." });
         }
     });
 
