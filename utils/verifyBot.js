@@ -222,14 +222,26 @@ function withTimeout(promise, ms, fallback) {
     ]);
 }
 
-async function discoverBotServer(gameName, gamePassword) {
-    const serverZones = [
-        ...Object.keys(ggeServerMap),
-        ...Object.keys(e4kServerMap),
-    ];
+function buildPrioritizedServerZones(preferredServer) {
+    const preferred = preferredServer ? [preferredServer] : [];
+    const prioritizedGge = Object.keys(ggeServerMap)
+        .filter((zone) => zone !== preferredServer)
+        .filter((zone) => zone.startsWith("EmpireEx_"))
+        .sort((a, b) => {
+            const aIndex = Number(a.split("_")[1] ?? Number.MAX_SAFE_INTEGER);
+            const bIndex = Number(b.split("_")[1] ?? Number.MAX_SAFE_INTEGER);
+            return aIndex - bIndex;
+        })
+        .slice(0, 10);
+
+    return [...new Set([...preferred, ...prioritizedGge])];
+}
+
+async function discoverBotServer(gameName, gamePassword, preferredServer) {
+    const serverZones = buildPrioritizedServerZones(preferredServer);
     const maxConcurrency = 4;
     const perServerTimeoutMs = 12000;
-    const overallTimeoutMs = 45000;
+    const overallTimeoutMs = 25000;
     const startedAt = Date.now();
 
     let currentIndex = 0;

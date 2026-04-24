@@ -78,7 +78,7 @@ module.exports = function (sockets) {
     });
 
     app.post("/discover-server", async (req, res) => {
-        const { gameName, gamePassword, recaptchaToken } = req.body ?? {};
+        const { gameName, gamePassword, recaptchaToken, preferredServer } = req.body ?? {};
 
         if (!gameName || !gamePassword) {
             return res.status(400).json({ error: "gameName e gamePassword sao obrigatorios." });
@@ -90,7 +90,7 @@ module.exports = function (sockets) {
                 return res.status(400).json({ valid: false, reason: recaptcha.reason });
             }
 
-            const result = await discoverBotServer(gameName, gamePassword);
+            const result = await discoverBotServer(gameName, gamePassword, preferredServer);
             const status = result.valid ? 200 : 404;
             return res.status(status).json(result);
         } catch (error) {
