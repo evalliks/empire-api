@@ -223,18 +223,28 @@ function withTimeout(promise, ms, fallback) {
 }
 
 function buildPrioritizedServerZones(preferredServer) {
+    const allGgeZones = Object.keys(ggeServerMap);
     const preferred = preferredServer ? [preferredServer] : [];
-    const prioritizedGge = Object.keys(ggeServerMap)
+
+    const exactEmpireEx = allGgeZones.filter((zone) => zone === "EmpireEx");
+
+    const numberedEmpireEx = allGgeZones
         .filter((zone) => zone !== preferredServer)
-        .filter((zone) => zone.startsWith("EmpireEx_"))
+        .filter((zone) => /^EmpireEx_\d+$/.test(zone))
         .sort((a, b) => {
             const aIndex = Number(a.split("_")[1] ?? Number.MAX_SAFE_INTEGER);
             const bIndex = Number(b.split("_")[1] ?? Number.MAX_SAFE_INTEGER);
             return aIndex - bIndex;
         })
+        .slice(0, 15);
+
+    const specialEmpireEx = allGgeZones
+        .filter((zone) => zone !== preferredServer)
+        .filter((zone) => /^EmpireEx(SA|SP|S|VA|VK|XN|KA|V)_?/.test(zone) || /^EmpireEx(SA|SP|S|VA|VK|XN|KA|V)$/.test(zone))
+        .sort((a, b) => a.localeCompare(b))
         .slice(0, 10);
 
-    return [...new Set([...preferred, ...prioritizedGge])];
+    return [...new Set([...preferred, ...exactEmpireEx, ...numberedEmpireEx, ...specialEmpireEx])];
 }
 
 async function discoverBotServer(gameName, gamePassword, preferredServer) {
