@@ -1,7 +1,7 @@
 const { XMLParser } = require('fast-xml-parser');
 const { GgeSocket } = require('./ggeSocket');
 const { E4kSocket } = require('./e4kSocket');
-const { getActiveBots } = require('../firestoreService');
+const { getActiveBots } = require('../supabaseService');
 
 const parser = new XMLParser();
 
@@ -66,9 +66,9 @@ async function refreshServerMaps() {
 }
 
 /**
- * Cria um socket para um bot usando seus dados do Firestore.
+ * Cria um socket para um bot usando seus dados do Supabase.
  * Usa ggeServerMap e e4kServerMap para encontrar a URL do servidor.
- * @param {object} bot - Dados do bot do Firestore
+ * @param {object} bot - Dados do bot do Supabase
  * @returns {GgeSocket|E4kSocket|null}
  */
 function createSocketForBot(bot) {
@@ -96,14 +96,14 @@ function createSocketForBot(bot) {
 }
 
 /**
- * Carrega todos os bots ativos do Firestore e cria seus sockets.
+ * Carrega todos os bots ativos do Supabase e cria seus sockets.
  * Retorna um objeto { botId: GgeSocket|E4kSocket }.
  */
 async function getSockets() {
     await refreshServerMaps();
 
     const bots = await getActiveBots();
-    console.log(`Bots ativos no Firestore: ${bots.length}`);
+    console.log(`Bots ativos no Supabase: ${bots.length}`);
 
     const sockets = {};
     for (const bot of bots) {

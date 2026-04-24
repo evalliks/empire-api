@@ -10,9 +10,9 @@
   "author": "danadum",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
     "express": "^4.18.2",
     "fast-xml-parser": "^4.2.4",
-    "firebase-admin": "^13.8.0",
     "ws": "^8.13.0"
   }
 }

@@ -1,7 +1,7 @@
 
 const { BaseSocket } = require('./baseSocket');
 const { Event } = require('../event');
-const { setBotConnected, syncBotGameData } = require('../firestoreService');
+const { setBotConnected, syncBotGameData } = require('../supabaseService');
 
 class E4kSocket {
     /**

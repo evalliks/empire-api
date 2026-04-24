@@ -5,7 +5,7 @@ const {
     refreshServerMaps,
     createSocketForBot,
 } = require('./utils/ws/sockets');
-const { onBotsChange, setBotConnected } = require('./utils/firestoreService');
+const { onBotsChange, setBotConnected } = require('./utils/supabaseService');
 
 getSockets().then(async sockets => {
     connectSockets(sockets);
@@ -74,4 +74,8 @@ getSockets().then(async sockets => {
     const app = require('./app')(sockets);
     const PORT = process.env.PORT ?? 3000;
     app.listen(PORT, () => console.log(`API rodando na porta ${PORT}`));
+}).catch(err => {
+    console.error('\n[ERRO FATAL] Falha ao inicializar a API:');
+    console.error(err.message);
+    process.exit(1);
 });

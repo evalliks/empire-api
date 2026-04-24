@@ -1,17 +1,35 @@
 const admin = require('firebase-admin');
 
-// Suporte a credenciais via variável de ambiente ou Application Default Credentials
-const credential = process.env.FIREBASE_SERVICE_ACCOUNT
-    ? admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
-    : admin.credential.applicationDefault();
+let db;
+let FieldValue;
 
-admin.initializeApp({
-    credential,
-    projectId: process.env.FIREBASE_PROJECT_ID,
-});
+try {
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        throw new Error(
+            'Nenhuma credencial do Firebase encontrada.\n' +
+            '  → Defina a variável de ambiente FIREBASE_SERVICE_ACCOUNT com o conteúdo JSON\n' +
+            '    da service account (Firebase Console → Configurações → Contas de serviço).\n' +
+            '  → Ou defina GOOGLE_APPLICATION_CREDENTIALS com o caminho para o arquivo JSON.'
+        );
+    }
 
-const db = admin.firestore();
-const FieldValue = admin.firestore.FieldValue;
+    const credential = process.env.FIREBASE_SERVICE_ACCOUNT
+        ? admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
+        : admin.credential.applicationDefault();
+
+    admin.initializeApp({
+        credential,
+        projectId: process.env.FIREBASE_PROJECT_ID,
+    });
+
+    db = admin.firestore();
+    FieldValue = admin.firestore.FieldValue;
+    console.log('Firebase Admin SDK inicializado com sucesso.');
+} catch (err) {
+    console.error('\n[ERRO FATAL] Falha ao inicializar Firebase Admin SDK:');
+    console.error(err.message);
+    process.exit(1);
+}
 
 /**
  * Retorna todos os bots ativos (isOn: true) do Firestore.
