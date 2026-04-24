@@ -235,8 +235,7 @@ function buildPrioritizedServerZones(preferredServer) {
             const aIndex = Number(a.split("_")[1] ?? Number.MAX_SAFE_INTEGER);
             const bIndex = Number(b.split("_")[1] ?? Number.MAX_SAFE_INTEGER);
             return aIndex - bIndex;
-        })
-        .slice(0, 15);
+        });
 
     const specialEmpireEx = allGgeZones
         .filter((zone) => zone !== preferredServer)

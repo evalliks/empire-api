@@ -53,6 +53,37 @@ async function setBotConnected(botId, connected) {
     }
 }
 
+async function getUserFromAccessToken(accessToken) {
+    if (!accessToken) return null;
+
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    if (error || !data?.user) return null;
+    return data.user;
+}
+
+async function setBotPower(botId, isOn, userId) {
+    let query = supabase
+        .from('bots')
+        .update({ is_on: isOn })
+        .eq('id', botId)
+        .select('id,user_id,is_on,connected')
+        .single();
+
+    if (userId) {
+        query = supabase
+            .from('bots')
+            .update({ is_on: isOn })
+            .eq('id', botId)
+            .eq('user_id', userId)
+            .select('id,user_id,is_on,connected')
+            .single();
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
 async function syncBotGameData(botId, gpiData) {
     try {
         const update = {
@@ -101,5 +132,7 @@ module.exports = {
     getActiveBots,
     onBotsChange,
     setBotConnected,
+    getUserFromAccessToken,
+    setBotPower,
     syncBotGameData,
 };

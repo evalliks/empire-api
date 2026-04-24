@@ -3,6 +3,7 @@ const commands = require('./data/commands.json');
 const { setNestedValue } = require('./utils/nestedHeaders');
 const { verifyBot, discoverBotServer } = require('./utils/verifyBot');
 const { ggeServerMap, e4kServerMap } = require('./utils/ws/sockets');
+const { getUserFromAccessToken, setBotPower } = require('./utils/supabaseService');
 
 module.exports = function (sockets) {
     const app = express();
@@ -43,6 +44,38 @@ module.exports = function (sockets) {
         }
 
         return { valid: true };
+    }
+
+    async function getAuthenticatedUser(req) {
+        const authHeader = req.get("authorization") ?? "";
+        const match = authHeader.match(/^Bearer\s+(.+)$/i);
+        return getUserFromAccessToken(match?.[1]);
+    }
+
+    async function handleSetBotStatus(req, res, input) {
+        const user = await getAuthenticatedUser(req);
+        if (!user) {
+            return res.status(401).json({ error: "Sessao invalida ou expirada." });
+        }
+
+        const botId = String(input.botId ?? "");
+        const isOn = input.isOn;
+
+        if (!botId || typeof isOn !== "boolean") {
+            return res.status(400).json({ error: "botId e isOn sao obrigatorios." });
+        }
+
+        try {
+            const bot = await setBotPower(botId, isOn, user.id);
+            return res.status(200).json({
+                botId: bot.id,
+                isOn: bot.is_on,
+                connected: sockets[bot.id]?.connected?.isSet ?? false,
+            });
+        } catch (error) {
+            console.error("Erro ao alterar status do bot:", error.message);
+            return res.status(404).json({ error: "Bot nao encontrado para este usuario." });
+        }
     }
 
     // ─── Lista de servidores disponíveis ─────────────────────────────────────
@@ -97,6 +130,20 @@ module.exports = function (sockets) {
             console.error("Erro em /discover-server:", error.message);
             return res.status(500).json({ valid: false, reason: "Erro interno na descoberta do servidor." });
         }
+    });
+
+    app.post("/bots/:botId/status", async (req, res) => {
+        return handleSetBotStatus(req, res, {
+            botId: req.params.botId,
+            isOn: req.body?.isOn,
+        });
+    });
+
+    app.get("/setBotStatus.php", async (req, res) => {
+        return handleSetBotStatus(req, res, {
+            botId: req.query.bot,
+            isOn: String(req.query.status) === "1",
+        });
     });
 
     // ─── Envia comando do jogo pelo socket de um bot ─────────────────────────
