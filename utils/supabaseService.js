@@ -125,6 +125,7 @@ function rowToBot(row) {
         connected: row.connected,
         commanders: row.commanders ?? 0,
         allianceId: row.alliance_id,
+        alertSettings: row.alert_settings ?? null,
     };
 }
 

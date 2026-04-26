@@ -13,7 +13,7 @@ module.exports = function (sockets) {
     app.use((req, res, next) => {
         res.header("Access-Control-Allow-Origin", "*");
         res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+        res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
         if (req.method === "OPTIONS") return res.sendStatus(204);
         next();
     });
@@ -47,6 +47,50 @@ module.exports = function (sockets) {
         } catch (error) {
             console.error("Erro ao alterar status do bot:", error.message);
             return res.status(404).json({ error: "Bot nao encontrado para este usuario." });
+        }
+    }
+
+    async function handleRawCommand(res, botId, input) {
+        const { command, args = [], waitForCommand, timeout = 5000 } = input ?? {};
+
+        if (!(botId in sockets)) {
+            return res.status(404).json({ error: "Bot nao encontrado ou desconectado." });
+        }
+
+        const botSocket = sockets[botId];
+
+        if (!botSocket.connected.isSet) {
+            return res.status(500).json({ error: "Bot nao esta conectado ao servidor do jogo." });
+        }
+
+        if (!command || typeof command !== "string" || !Array.isArray(args)) {
+            return res.status(400).json({ error: "command e args[] sao obrigatorios." });
+        }
+
+        try {
+            botSocket.socket.sendRawCommand(command, args.map(String));
+
+            if (!waitForCommand) {
+                return res.status(200).json({ botId, command, args, sent: true });
+            }
+
+            const response = await botSocket.socket.waitForJsonResponse(
+                String(waitForCommand),
+                true,
+                Number(timeout) || 5000
+            );
+
+            return res.status(200).json({
+                botId,
+                command,
+                args,
+                sent: true,
+                return_code: response.payload.status,
+                content: response.payload.data,
+            });
+        } catch (error) {
+            console.error(`Erro no raw-command ${command} (bot ${botId}):`, error.message);
+            return res.status(400).json({ error: "Comando raw invalido, timeout ou resposta incorreta." });
         }
     }
 
@@ -98,6 +142,24 @@ module.exports = function (sockets) {
         return handleSetBotStatus(req, res, {
             botId: req.params.botId,
             isOn: req.body?.isOn,
+        });
+    });
+
+    app.post("/bots/:botId/raw-command", async (req, res) => {
+        const { botId } = req.params;
+        return handleRawCommand(res, botId, req.body);
+    });
+
+    app.post("/bots/:botId/alerts/send-soldiers", async (req, res) => {
+        const { castleId, mode = 1, wave = 0, amount = 12 } = req.body ?? {};
+
+        if (!castleId) {
+            return res.status(400).json({ error: "castleId e obrigatorio." });
+        }
+
+        return handleRawCommand(res, req.params.botId, {
+            command: "sendSoldiers",
+            args: [castleId, mode, wave, amount],
         });
     });
 
